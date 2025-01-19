@@ -1,6 +1,8 @@
 -- [How I Use Wezterm & Zsh For An Amazing Terminal Setup On My Mac | Josean Martinez](https://www.youtube.com/watch?v=TTgQV21X0SQ)
 -- [How I use Wezterm by Matthew Weier O'Phinney](https://mwop.net/blog/2024-07-04-how-i-use-wezterm.html)
 -- [My Wezterm Config | acklackl](https://www.youtube.com/watch?v=V1X4WQTaxrc)
+-- [Make Wezterm Mimic Tmux by Lovelin](https://dev.to/lovelindhoni/make-wezterm-mimic-tmux-5893)
+-- [Okay, I really like WezTerm by Alex Plescan](https://alexplescan.com/posts/2024/08/10/wezterm/)
 
 -- [How to switch from Tmux to WezTerm by Florian Bellmann](https://www.florianbellmann.com/blog/switch-from-tmux-to-wezterm)
 -- [Multiplexing](https://wezfurlong.org/wezterm/multiplexing.html)
