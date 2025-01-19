@@ -30,76 +30,6 @@ wezterm.on("restore_session", function(window)
 	session_manager.restore_state(window)
 end)
 
--- Wezterm <-> nvim pane navigation
--- You will need to install https://github.com/aca/wezterm.nvim
--- and ensure you export NVIM_LISTEN_ADDRESS per the README in that repo
-
-local move_around = function(window, pane, direction_wez, direction_nvim)
-	local result = os.execute(
-		"env NVIM_LISTEN_ADDRESS=/tmp/nvim"
-			.. pane:pane_id()
-			.. " "
-			.. wezterm.home_dir
-			.. "/.local/bin/wezterm.nvim.navigator"
-			.. " "
-			.. direction_nvim
-	)
-	if result then
-		window:perform_action(act({ SendString = "\x17" .. direction_nvim }), pane)
-	else
-		window:perform_action(act({ ActivatePaneDirection = direction_wez }), pane)
-	end
-end
-
-wezterm.on("move-left", function(window, pane)
-	move_around(window, pane, "Left", "h")
-end)
-
-wezterm.on("move-right", function(window, pane)
-	move_around(window, pane, "Right", "l")
-end)
-
-wezterm.on("move-up", function(window, pane)
-	move_around(window, pane, "Up", "k")
-end)
-
-wezterm.on("move-down", function(window, pane)
-	move_around(window, pane, "Down", "j")
-end)
-
-local vim_resize = function(window, pane, direction_wez, direction_nvim)
-	local result = os.execute(
-		"env NVIM_LISTEN_ADDRESS=/tmp/nvim"
-			.. pane:pane_id()
-			.. " "
-			.. wezterm.home_dir
-			.. "/.local/bin/wezterm.nvim.navigator"
-			.. " "
-			.. direction_nvim
-	)
-	if result then
-		window:perform_action(act({ SendString = "\x1b" .. direction_nvim }), pane)
-	else
-		window:perform_action(act({ ActivatePaneDirection = direction_wez }), pane)
-	end
-end
-
-wezterm.on("resize-left", function(window, pane)
-	vim_resize(window, pane, "Left", "h")
-end)
-
-wezterm.on("resize-right", function(window, pane)
-	vim_resize(window, pane, "Right", "l")
-end)
-
-wezterm.on("resize-up", function(window, pane)
-	vim_resize(window, pane, "Up", "k")
-end)
-
-wezterm.on("resize-down", function(window, pane)
-	vim_resize(window, pane, "Down", "j")
-end)
-
 -- --------------------------------------------------------------------
 -- CONFIGURATION
 -- --------------------------------------------------------------------
@@ -264,43 +194,43 @@ config.keys = {
 	{
 		key = "h",
 		mods = "CTRL",
-		action = act({ EmitEvent = "move-left" }),
+		action = act.ActivatePaneDirection("Left"),
 	},
 	{
 		key = "j",
 		mods = "CTRL",
-		action = act({ EmitEvent = "move-down" }),
+		action = act.ActivatePaneDirection("Down"),
 	},
 	{
 		key = "k",
 		mods = "CTRL",
-		action = act({ EmitEvent = "move-up" }),
+		action = act.ActivatePaneDirection("Up"),
 	},
 	{
 		key = "l",
 		mods = "CTRL",
-		action = act({ EmitEvent = "move-right" }),
+		action = act.ActivatePaneDirection("Right"),
 	},
-	-- ALT + (h,j,k,l) to resize panes
+	-- LEADER + (h,j,k,l) to resize panes
 	{
 		key = "h",
-		mods = "ALT",
-		action = act({ EmitEvent = "resize-left" }),
+		mods = "LEADER",
+		action = act.AdjustPaneSize({ "Left", 5 }),
 	},
 	{
 		key = "j",
-		mods = "ALT",
-		action = act({ EmitEvent = "resize-down" }),
+		mods = "LEADER",
+		action = act.AdjustPaneSize({ "Down", 5 }),
 	},
 	{
 		key = "k",
-		mods = "ALT",
-		action = act({ EmitEvent = "resize-up" }),
+		mods = "LEADER",
+		action = act.AdjustPaneSize({ "Up", 5 }),
 	},
 	{
 		key = "l",
-		mods = "ALT",
-		action = act({ EmitEvent = "resize-right" }),
+		mods = "LEADER",
+		action = act.AdjustPaneSize({ "Right", 5 }),
 	},
 	-- Close/kill active pane
 	{
