@@ -88,6 +88,7 @@ config.colors = {
 			bg_color = "#2aa198",
 		},
 	},
+	split = "#ffffff",
 }
 
 -- Setup muxing by default
