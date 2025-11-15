@@ -49,7 +49,7 @@ config.color_scheme = "Poimandres"
 
 config.enable_scroll_bar = true
 config.enable_wayland = true
-config.font = wezterm.font("MesloLGS Nerd Font Mono")
+config.font = wezterm.font("IBM Plex Mono")
 config.font_size = 19
 -- config.font = wezterm.font('Hack')
 config.hide_tab_bar_if_only_one_tab = false
@@ -113,6 +113,13 @@ config.keys = {
 		mods = "LEADER",
 		action = act.ActivateCopyMode,
 	},
+	{ key = "c", mods = "CMD", action = wezterm.action.CopyTo("Clipboard") },
+	{ key = "v", mods = "CMD", action = wezterm.action.PasteFrom("Clipboard") },
+	{ key = "LeftArrow", mods = "OPT", action = wezterm.action.SendString("\x1bb") },
+	{ key = "RightArrow", mods = "OPT", action = wezterm.action.SendString("\x1bf") },
+	{ key = "LeftArrow", mods = "CMD", action = wezterm.action.SendString("\x01") },
+	{ key = "RightArrow", mods = "CMD", action = wezterm.action.SendString("\x05") },
+	{ key = "f", mods = "CMD", action = wezterm.action.Search("CurrentSelectionOrEmptyString") },
 
 	-- ----------------------------------------------------------------
 	-- TABS
