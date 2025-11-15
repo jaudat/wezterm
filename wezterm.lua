@@ -152,12 +152,13 @@ config.keys = {
 			end),
 		}),
 	},
-	-- Move to next/previous TAB
+	-- Move to next TAB
 	{
 		key = "n",
 		mods = "LEADER",
 		action = act.ActivateTabRelative(1),
 	},
+	-- Move to previous TAB
 	{
 		key = "p",
 		mods = "LEADER",
@@ -168,6 +169,18 @@ config.keys = {
 		key = "&",
 		mods = "LEADER|SHIFT",
 		action = act.CloseCurrentTab({ confirm = true }),
+	},
+	-- Move tab backward with Leader + ,
+	{
+		key = "<",
+		mods = "LEADER|SHIFT",
+		action = wezterm.action.MoveTabRelative(-1),
+	},
+	-- Move tab forward with Leader + .
+	{
+		key = ">",
+		mods = "LEADER|SHIFT",
+		action = wezterm.action.MoveTabRelative(1),
 	},
 
 	-- ----------------------------------------------------------------
