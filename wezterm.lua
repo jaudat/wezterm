@@ -10,7 +10,7 @@
 -- Pull in the wezterm API
 local os = require("os")
 local wezterm = require("wezterm")
-local session_manager = require("wezterm-session-manager/session-manager")
+local resurrect = wezterm.plugin.require("https://github.com/MLFlexer/resurrect.wezterm")
 local act = wezterm.action
 local mux = wezterm.mux
 
@@ -18,17 +18,24 @@ local mux = wezterm.mux
 -- FUNCTIONS AND EVENT BINDINGS
 -- --------------------------------------------------------------------
 
--- Session Manager event bindings
--- See https://github.com/danielcopper/wezterm-session-manager
-wezterm.on("save_session", function(window)
-	session_manager.save_state(window)
-end)
-wezterm.on("load_session", function(window)
-	session_manager.load_state(window)
-end)
-wezterm.on("restore_session", function(window)
-	session_manager.restore_state(window)
-end)
+-- Resurrect state management
+-- See https://github.com/MLFlexer/resurrect.wezterm
+--
+-- periodic_save writes the current state on a timer; that same file is what
+-- resurrect_on_gui_startup reads to bring the last session back on launch,
+-- so the two together cover both halves of tmux-continuum's behaviour.
+resurrect.state_manager.periodic_save({
+	interval_seconds = 900,
+	save_workspaces = true,
+	save_windows = true,
+	save_tabs = true,
+})
+
+-- Cap the scrollback captured per pane so the state files stay small
+resurrect.state_manager.set_max_nlines(1000)
+
+-- Resume the previous session on startup
+wezterm.on("gui-startup", resurrect.state_manager.resurrect_on_gui_startup)
 
 -- --------------------------------------------------------------------
 -- CONFIGURATION
@@ -97,6 +104,10 @@ config.unix_domains = {
 		name = "unix",
 	},
 }
+
+-- Spawn panes into the mux server rather than locally, so that workspaces,
+-- tabs and running processes survive quitting the GUI.
+config.default_domain = "unix"
 
 -- Custom key bindings
 config.keys = {
@@ -314,6 +325,19 @@ config.keys = {
 		mods = "LEADER",
 		action = act.ShowLauncherArgs({ flags = "WORKSPACES" }),
 	},
+	-- Create a new named session; analagous to command in tmux
+	{
+		key = "N",
+		mods = "LEADER|SHIFT",
+		action = act.PromptInputLine({
+			description = "Enter name for new workspace",
+			action = wezterm.action_callback(function(window, pane, line)
+				if line then
+					window:perform_action(act.SwitchToWorkspace({ name = line }), pane)
+				end
+			end),
+		}),
+	},
 	-- Rename current session; analagous to command in tmux
 	{
 		key = "$",
@@ -328,21 +352,41 @@ config.keys = {
 		}),
 	},
 
-	-- Session manager bindings
+	-- Save the current workspace state
 	{
 		key = "s",
 		mods = "LEADER|SHIFT",
-		action = act({ EmitEvent = "save_session" }),
+		action = wezterm.action_callback(function(window, _)
+			resurrect.state_manager.save_state(resurrect.workspace_state.get_workspace_state())
+			window:toast_notification("WezTerm", "Workspace state saved", nil, 4000)
+		end),
 	},
-	{
-		key = "L",
-		mods = "LEADER|SHIFT",
-		action = act({ EmitEvent = "load_session" }),
-	},
+	-- Restore a saved workspace, window or tab via the fuzzy picker
 	{
 		key = "R",
 		mods = "LEADER|SHIFT",
-		action = act({ EmitEvent = "restore_session" }),
+		action = wezterm.action_callback(function(window, pane)
+			resurrect.fuzzy_loader.fuzzy_load(window, pane, function(id, _)
+				local state_type = string.match(id, "^([^/]+)")
+				id = string.match(id, "([^/]+)$")
+				id = string.match(id, "(.+)%..+$")
+
+				local opts = {
+					relative = true,
+					restore_text = true,
+					on_pane_restore = resurrect.tab_state.default_on_pane_restore,
+				}
+
+				if state_type == "workspace" then
+					resurrect.workspace_state.restore_workspace(resurrect.state_manager.load_state(id, "workspace"), opts)
+				elseif state_type == "window" then
+					opts.window = pane:window()
+					resurrect.window_state.restore_window(pane:window(), resurrect.state_manager.load_state(id, "window"), opts)
+				elseif state_type == "tab" then
+					resurrect.tab_state.restore_tab(pane:tab(), resurrect.state_manager.load_state(id, "tab"), opts)
+				end
+			end)
+		end),
 	},
 }
 
