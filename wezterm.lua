@@ -21,21 +21,117 @@ local mux = wezterm.mux
 -- Resurrect state management
 -- See https://github.com/MLFlexer/resurrect.wezterm
 --
--- periodic_save writes the current state on a timer; that same file is what
--- resurrect_on_gui_startup reads to bring the last session back on launch,
--- so the two together cover both halves of tmux-continuum's behaviour.
+-- periodic_save writes state/workspace/<name>.json, but resurrect_on_gui_startup
+-- reads state/current_state -- a file nothing in the plugin ever writes. Hence
+-- the periodic_save.finished hook below; without it, startup restore no-ops.
+--
+-- save_windows/save_tabs off: periodic_save skips windows and tabs with empty
+-- titles, and the workspace snapshot already nests every window, tab and pane.
 resurrect.state_manager.periodic_save({
 	interval_seconds = 900,
 	save_workspaces = true,
-	save_windows = true,
-	save_tabs = true,
+	save_windows = false,
+	save_tabs = false,
 })
 
--- Cap the scrollback captured per pane so the state files stay small
-resurrect.state_manager.set_max_nlines(1000)
+-- No scrollback capture is possible here: resurrect only saves pane text in the
+-- "local" domain, and default_domain is "unix". The mux keeps live scrollback
+-- across GUI restarts anyway; only a reboot loses it. Layout and cwd still
+-- restore, and set_max_nlines() is omitted since it governed only that capture.
+local function remember_active_workspace()
+	resurrect.state_manager.write_current_state(mux.get_active_workspace(), "workspace")
+end
 
--- Resume the previous session on startup
-wezterm.on("gui-startup", resurrect.state_manager.resurrect_on_gui_startup)
+wezterm.on("resurrect.state_manager.periodic_save.finished", remember_active_workspace)
+
+-- Never restore on top of a live mux: it has already reattached the real
+-- windows, and the snapshot would duplicate every one of them.
+wezterm.on("gui-startup", function(cmd)
+	if #mux.all_windows() > 0 then
+		return
+	end
+
+	resurrect.state_manager.resurrect_on_gui_startup()
+
+	-- restore_workspace spawns synchronously, so an empty list means nothing was
+	-- restored -- open a window rather than starting with none.
+	if #mux.all_windows() == 0 then
+		mux.spawn_window(cmd or {})
+	end
+end)
+
+-- --------------------------------------------------------------------
+-- PROJECT SESSIONIZER
+--
+-- tmux-sessionizer equivalent: one keystroke to a workspace rooted at a project
+-- directory, created on first visit. Uses InputSelector, so no fzf or zoxide.
+-- --------------------------------------------------------------------
+
+local sessionizer_roots = {
+	wezterm.home_dir .. "/Workbench",
+}
+
+local sessionizer_pinned = {
+	wezterm.home_dir .. "/.config/nvim",
+	wezterm.home_dir .. "/.config/wezterm",
+	wezterm.home_dir .. "/.config/ghostty",
+}
+
+local function discover_projects()
+	local seen, projects = {}, {}
+
+	local function add(path)
+		path = path:gsub("/+$", "")
+		local name = path:match("([^/]+)$")
+		if name and not seen[path] then
+			seen[path] = true
+			table.insert(projects, { id = path, label = name })
+		end
+	end
+
+	for _, root in ipairs(sessionizer_roots) do
+		for _, dir in ipairs(wezterm.glob(root .. "/*/")) do
+			add(dir)
+		end
+	end
+
+	for _, dir in ipairs(sessionizer_pinned) do
+		add(dir)
+	end
+
+	table.sort(projects, function(a, b)
+		return a.label:lower() < b.label:lower()
+	end)
+
+	return projects
+end
+
+local switch_to_project = wezterm.action_callback(function(window, pane)
+	window:perform_action(
+		act.InputSelector({
+			title = "Projects",
+			description = "Select a project to open as a workspace",
+			fuzzy = true,
+			fuzzy_description = "Project: ",
+			choices = discover_projects(),
+			action = wezterm.action_callback(function(inner_window, inner_pane, id, label)
+				if not id then
+					return
+				end
+
+				-- Snapshot the outgoing workspace while it is still active.
+				resurrect.state_manager.save_state(resurrect.workspace_state.get_workspace_state())
+				resurrect.state_manager.write_current_state(label, "workspace")
+
+				inner_window:perform_action(
+					act.SwitchToWorkspace({ name = label, spawn = { cwd = id } }),
+					inner_pane
+				)
+			end),
+		}),
+		pane
+	)
+end)
 
 -- --------------------------------------------------------------------
 -- CONFIGURATION
@@ -319,11 +415,17 @@ config.keys = {
 		action = act.DetachDomain({ DomainName = "unix" }),
 	},
 
-	-- Show list of workspaces
+	-- Show list of workspaces that already exist
 	{
 		key = "s",
 		mods = "LEADER",
 		action = act.ShowLauncherArgs({ flags = "WORKSPACES" }),
+	},
+	-- Jump to any project directory, creating its workspace on first visit
+	{
+		key = "f",
+		mods = "LEADER",
+		action = switch_to_project,
 	},
 	-- Create a new named session; analagous to command in tmux
 	{
@@ -358,6 +460,7 @@ config.keys = {
 		mods = "LEADER|SHIFT",
 		action = wezterm.action_callback(function(window, _)
 			resurrect.state_manager.save_state(resurrect.workspace_state.get_workspace_state())
+			remember_active_workspace()
 			window:toast_notification("WezTerm", "Workspace state saved", nil, 4000)
 		end),
 	},
@@ -371,9 +474,9 @@ config.keys = {
 				id = string.match(id, "([^/]+)$")
 				id = string.match(id, "(.+)%..+$")
 
+				-- No restore_text: pane text is never captured under the unix domain.
 				local opts = {
 					relative = true,
-					restore_text = true,
 					on_pane_restore = resurrect.tab_state.default_on_pane_restore,
 				}
 
