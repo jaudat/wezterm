@@ -157,8 +157,14 @@ config.font_size = 19
 -- config.font = wezterm.font('Hack')
 config.hide_tab_bar_if_only_one_tab = false
 -- The leader is similar to how tmux defines a set of keys to hit in order to
--- invoke tmux bindings. Binding to ctrl-a here to mimic tmux
-config.leader = { key = "a", mods = "CTRL", timeout_milliseconds = 2000 }
+-- invoke tmux bindings.
+--
+-- CMD, not CTRL: cmd chords are handled by the GUI and never written to the
+-- pty, so this hands ctrl-a back to the remote side, where tmux uses it as its
+-- own prefix. The modifier now tells you which layer you are driving --
+-- cmd+<key> acts locally, ctrl-a <key> acts on the tmux session -- while the
+-- suffixes stay identical in both.
+config.leader = { key = "a", mods = "CMD", timeout_milliseconds = 2000 }
 config.mouse_bindings = {
 	-- Open URLs with Ctrl+Click
 	{
@@ -318,25 +324,33 @@ config.keys = {
 			size = { Percent = 50 },
 		}),
 	},
-	-- CTRL + (h,j,k,l) to move between panes
+	-- CMD + (h,j,k,l) to move between panes.
+	--
+	-- CMD, not CTRL: cmd chords are handled by the GUI and never written to the
+	-- pty, so this leaves ctrl+h/j/k/l free for whatever is running in the pane --
+	-- nvim's window navigation (init.lua:249-252), oil's splits, and ctrl+l
+	-- clear-screen in the shell, all of which a CTRL binding here swallowed.
+	--
+	-- Overrides two WezTerm defaults: cmd+h was HideApplication (cmd+m still
+	-- minimizes) and cmd+k was ClearScrollback.
 	{
 		key = "h",
-		mods = "CTRL",
+		mods = "CMD",
 		action = act.ActivatePaneDirection("Left"),
 	},
 	{
 		key = "j",
-		mods = "CTRL",
+		mods = "CMD",
 		action = act.ActivatePaneDirection("Down"),
 	},
 	{
 		key = "k",
-		mods = "CTRL",
+		mods = "CMD",
 		action = act.ActivatePaneDirection("Up"),
 	},
 	{
 		key = "l",
-		mods = "CTRL",
+		mods = "CMD",
 		action = act.ActivatePaneDirection("Right"),
 	},
 	-- LEADER + (h,j,k,l) to resize panes
