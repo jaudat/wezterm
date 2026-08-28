@@ -44,9 +44,13 @@ end
 
 wezterm.on("resurrect.state_manager.periodic_save.finished", remember_active_workspace)
 
--- Never restore on top of a live mux: it has already reattached the real
--- windows, and the snapshot would duplicate every one of them.
+-- Never restore on top of a live mux: it already holds the real windows, and
+-- the snapshot would duplicate every one of them. Attach explicitly first --
+-- gui-startup fires before WezTerm's own attach, so all_windows() is still
+-- empty at this point and the guard below would never fire.
 wezterm.on("gui-startup", function(cmd)
+	mux.get_domain("unix"):attach()
+
 	if #mux.all_windows() > 0 then
 		return
 	end
